@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>今何問目ゲーム</title>
+
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: black;
+  font-family: sans-serif;
+  color: white;
+}
+
+#bgCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+/* ★タイマー点滅用のアニメーション */
+.blink {
+  animation: blink-anime 0.2s infinite alternate;
+}
+@keyframes blink-anime {
+  0% { opacity: 1; }
+  100% { opacity: 0.3; }
+}
+
+.center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+button {
+  font-size: 20px;
+  padding: 12px 25px;
+  margin: 10px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+}
+
+#game, #rule, #end {
+  display: none;
+}
+
+#question {
+  font-size: 30px;
+  margin-bottom: 20px;
+}
+
+input {
+  font-size: 26px;
+  width: 140px;
+  text-align: center;
+  border-radius: 10px;
+  border: none;
+  padding: 10px;
+}
+
+.flash {
+  animation: flash 0.3s;
+}
+@keyframes flash {
+  0% { background: red; }
+  100% { background: black; }
+}
+
+.logBox {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #555;
+  padding: 10px;
+}
+.logItem {
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #333;
+}
+</style>
+
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+
+<div id="menu" class="center">
+  <h1>今何問目ゲーム</h1>
+  <button onclick="showRule()">ルール</button><br>
+  <button onclick="startGameWithBGM()">スタート</button>
+</div>
+
+<div id="rule" class="center">
+  <h2>ルール</h2>
+  <p>
+  ・問題の答えを数字で入力<br>
+  ・今何問目か覚える<br>
+  ・間違えたら終了
+  </p>
+  <button onclick="backMenu()">戻る</button>
+</div>
+
+<div id="game" class="center">
+  <div id="question"></div>
+  <input id="answer" type="number">
+</div>
+
+<div id="end" class="center">
+  <h2>結果</h2>
+  <p id="summary"></p>
+  <div id="resultText" class="logBox"></div>
+  <button onclick="restart()">もう一回</button>
+</div>
+
+<audio id="bgm" src="Guide_Me_to_Heaven.mp3" loop preload="auto"></audio>
+<audio id="seCorrect" src="se_correct.mp3" preload="auto"></audio>
+<audio id="seWrong" src="se_wrong.mp3" preload="auto"></audio>
+
+<script>
+let currentQuestion = 1;
+let currentText = "";
+let correctAnswer = 0;
+
+let history = [];
+let timeLeft = 100;
+let timerInterval;
+
+let isSubmitting = false;
+let isGameOver = false;
+
+const canvas = document.getElementById("bgCanvas");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.onresize = resize;
+
+// ===== BGM・SE管理 =====
+const bgm = document.getElementById("bgm");
+bgm.loop = true;
+bgm.volume = 0.5;
+
+const seCorrect = document.getElementById("seCorrect");
+seCorrect.volume = 0.6;
+
+const seWrong = document.getElementById("seWrong");
+seWrong.volume = 0.6;
+
+function playAudio(audioObj) {
+  if (!audioObj) return;
+  audioObj.play().catch(e => console.warn("再生失敗:", e));
+}
+
+window.addEventListener("load", ()=>{
+    bgm.play().catch(e=>{
+        document.addEventListener("click", startAudio, {once: true});
+        document.addEventListener("keydown", startAudio, {once: true});
+    });
+});
+
+function startAudio(){
+    playAudio(bgm);
+}
+
+// ===== 画面遷移 =====
+function showRule(){
+  menu.style.display="none";
+  rule.style.display="block";
+}
+function backMenu(){
+  rule.style.display="none";
+  menu.style.display="block";
+}
+function startGame(){
+  menu.style.display="none";
+  end.style.display="none";
+  game.style.display="block";
+
+  currentQuestion = 1;
+  history = [];
+  isGameOver = false;
+  isSubmitting = false;
+  answer.value = "";
+  document.body.classList.remove("flash");
+  canvas.classList.remove("blink"); // 点滅リセット
+
+  forceFocus();
+  nextQuestion();
+}
+
+function restart(){
+  clearInterval(timerInterval);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  canvas.classList.remove("blink"); // 点滅リセット
+  
+  end.style.display = "none";
+  menu.style.display = "block";
+  
+  playAudio(bgm);
+}
+
+// ===== 問題生成 =====
+function generateProblem(){
+  let base = Math.floor(Math.random()*20)+10;
+  let result = base;
+  let text = base + "問目";
+
+  for(let i=0;i<3;i++){
+    let num = Math.floor(Math.random()*9)+1;
+
+    if(Math.random()>0.5){
+      text += "の" + num + "問後";
+      result += num;
+    }else{
+      if(result - num < 1){
+        text += "の" + num + "問後";
+        result += num;
+      }else{
+        text += "の" + num + "問前";
+        result -= num;
+      }
+    }
+  }
+
+  correctAnswer = result;
+  currentText = text + "は何問目？";
+  question.innerText = currentText;
+}
+
+function showTrap(){
+  correctAnswer = currentQuestion;
+  currentText = "今何問目？";
+  question.innerText = currentText;
+}
+
+function nextQuestion(){
+  clearInterval(timerInterval);
+  isSubmitting = false;
+  canvas.classList.remove("blink"); // 次の問題で点滅リセット
+
+  if(Math.random()<0.3) showTrap();
+  else generateProblem();
+
+  startTimer();
+}
+
+function startGameWithBGM(){
+  startGame();
+  playAudio(bgm);
+}
+
+// ===== タイマー描画 =====
+function drawTimer(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  let cx = canvas.width/2;
+  let cy = canvas.height/2;
+  let a = Math.min(canvas.width,canvas.height)/2 - 60;
+  let b = a * 0.6;
+
+  let totalBars = 120;
+  let visibleBars = Math.floor((timeLeft/100)*totalBars);
+
+  // ★修正：残り30%を切ったら点滅クラスを付与
+  if(timeLeft <= 30) {
+    canvas.classList.add("blink");
+  } else {
+    canvas.classList.remove("blink");
+  }
+
+  for(let i=0;i<totalBars;i++){
+    let ang = (i/totalBars)*Math.PI*2 - Math.PI/2;
+    let x = cx + a*Math.cos(ang);
+    let y = cy + b*Math.sin(ang);
+    let nx = Math.cos(ang);
+    let ny = Math.sin(ang);
+
+    let color="#333";
+    if(i < visibleBars){
+      if(timeLeft<=30) color="red"; // 30以下は赤
+      else if(timeLeft<60) color="orange";
+      else color="cyan";
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.lineTo(x+nx*18,y+ny*18);
+    ctx.strokeStyle=color;
+    ctx.lineWidth=3;
+    ctx.stroke();
+  }
+}
+
+function startTimer(){
+  timeLeft=100;
+  clearInterval(timerInterval);
+
+  timerInterval=setInterval(()=>{
+    if(isGameOver) return;
+
+    timeLeft--;
+    drawTimer();
+
+    if(timeLeft<=0){
+      canvas.classList.remove("blink"); // 終了したら点滅停止
+      history.push({
+        number: currentQuestion,
+        question: currentText,
+        your: "未回答",
+        correct: correctAnswer,
+        result: false
+      });
+      gameOver();
+    }
+  },100);
+}
+
+// ===== 終了処理 =====
+function gameOver(){
+  if(isGameOver) return;
+  isGameOver = true;
+
+  clearInterval(timerInterval);
+  canvas.classList.remove("blink"); // ゲームオーバー時に点滅停止
+  document.body.classList.add("flash");
+
+  seWrong.currentTime = 0;
+  playAudio(seWrong);
+
+  setTimeout(()=>{
+    game.style.display="none";
+    end.style.display="block";
+
+    let correctCount = history.filter(h => h.result).length;
+
+    summary.innerHTML =
+      "記録: " + correctCount + "問<br>" +
+      "挑戦数: " + history.length + "問";
+
+    let html = "";
+    history.forEach(h=>{
+      html += `
+      <div class="logItem">
+        <b>${h.number}問目</b><br>
+        ${h.question}<br>
+        あなた: ${h.your} / 正解: ${h.correct}<br>
+        <span style="color:${h.result ? 'lime':'red'}">
+          ${h.result ? '○ 正解':'× 不正解'}
+        </span>
+      </div>
+      `;
+    });
+    resultText.innerHTML = html;
+  },200);
+}
+
+// ===== 回答処理 =====
+function submitAnswer(){
+  if(answer.value === "" || isSubmitting || isGameOver) return;
+  
+  isSubmitting = true;
+  clearInterval(timerInterval);
+  canvas.classList.remove("blink"); // 回答したら点滅停止
+
+  let input = Number(answer.value);
+
+  let record = {
+    number: currentQuestion,
+    question: currentText,
+    your: input,
+    correct: correctAnswer,
+    result: (input === correctAnswer)
+  };
+
+  history.push(record);
+
+  if(input !== correctAnswer){
+    gameOver();
+    return;
+  }
+
+  seCorrect.currentTime = 0;
+  playAudio(seCorrect);
+
+  currentQuestion++;
+  answer.value="";
+  nextQuestion();
+}
+
+answer.addEventListener("keyup", e=>{
+  if(e.key==="Enter") submitAnswer();
+});
+
+function forceFocus(){
+  if(game.style.display==="block"){
+    answer.focus();
+  }
+}
+document.addEventListener("click", forceFocus);
+window.addEventListener("focus", forceFocus);
+setInterval(forceFocus,100);
+
+</script>
+</body>
+</html>

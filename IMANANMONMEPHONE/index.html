@@ -1,418 +1,353 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>今何問目ゲーム</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>今何問目ゲーム</title>
 
-<style>
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background: black;
-  font-family: sans-serif;
-  color: white;
-  -webkit-text-size-adjust: 100%;
-}
+  <style>
+    html, body {
+      margin: 0; padding: 0; overflow: hidden; background: black;
+      font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Kaku Gothic ProN", sans-serif;
+      color: white; -webkit-text-size-adjust: 100%;
+    }
 
-#bgCanvas {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
+    #bgCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
 
-.blink {
-  animation: blink-anime 0.2s infinite alternate;
-}
-@keyframes blink-anime {
-  0% { opacity: 1; }
-  100% { opacity: 0.3; }
-}
+    .blink { animation: blink-anime 0.2s infinite alternate; }
+    @keyframes blink-anime { 0% { opacity: 1; } 100% { opacity: 0.3; } }
 
-.center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  width: 90%;
-  max-width: 400px;
-}
+    .flash { animation: flash-anime 0.3s; }
+    @keyframes flash-anime { 0% { background: red; } 100% { background: black; } }
 
-h1 {
-  font-size: 32px;
-  margin-bottom: 30px;
-}
+    .center {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      text-align: center; width: 95%; max-width: 450px; z-index: 10;
+    }
 
-button {
-  font-size: 24px;
-  padding: 15px 30px;
-  margin: 10px;
-  border-radius: 15px;
-  border: none;
-  cursor: pointer;
-  background: #eee;
-  color: #333;
-  -webkit-tap-highlight-color: rgba(0,0,0,0);
-}
+    #game, #rule, #end { display: none; }
 
-#submitBtn {
-  background: cyan;
-  color: black;
-  font-weight: bold;
-  font-size: 22px;
-  padding: 15px 20px;
-  margin: 0 0 0 10px;
-  vertical-align: middle;
-}
+    h1 { font-size: 28px; margin-bottom: 25px; }
+    h2 { font-size: 24px; margin-bottom: 20px; }
+    #question { font-size: 28px; margin-bottom: 30px; line-height: 1.3; }
+    #t-rule-p { text-align: left; display: inline-block; font-size: 16px; line-height: 1.6; margin-bottom: 20px; }
+    #summary { font-size: 18px; line-height: 1.5; margin-bottom: 15px; }
 
-#game, #rule, #end {
-  display: none;
-}
+    button {
+      font-size: 18px; padding: 12px 24px; margin: 8px; border-radius: 12px;
+      border: none; cursor: pointer; background: #eee; color: #333;
+      -webkit-tap-highlight-color: rgba(0,0,0,0);
+    }
 
-#question {
-  font-size: 32px;
-  margin-bottom: 30px;
-  line-height: 1.3;
-}
+    #submitBtn { background: cyan; color: black; font-weight: bold; margin-left: 8px; }
 
-.input-area {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
+    .input-area { display: flex; justify-content: center; align-items: center; }
 
-input {
-  font-size: 32px;
-  width: 120px;
-  text-align: center;
-  border-radius: 15px;
-  border: 2px solid #555;
-  padding: 12px;
-  background: black;
-  color: white;
-  -webkit-appearance: none;
-  outline: none;
-  vertical-align: middle;
-}
-input:focus {
-  border-color: cyan;
-}
+    /* ★数字入力欄のスクロール・矢印を消す設定 */
+    input {
+      font-size: 32px; width: 100px; text-align: center; border-radius: 12px;
+      border: 2px solid #555; padding: 10px; background: black; color: white; outline: none;
+      -moz-appearance: textfield; /* Firefox用 */
+    }
 
-.logBox {
-  max-height: 40vh;
-  overflow-y: auto;
-  border: 1px solid #555;
-  padding: 10px;
-  margin-bottom: 20px;
-  background: rgba(255,255,255,0.05);
-  border-radius: 10px;
-}
-.logItem {
-  margin-bottom: 15px;
-  padding: 15px;
-  border: 1px solid #333;
-  border-radius: 8px;
-  text-align: left;
-}
-</style>
+    /* Chrome, Safari, Edge用のスピンボタン非表示設定 */
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
 
+    .lang-select { margin-bottom: 25px; display: flex; flex-wrap: wrap; justify-content: center; }
+    .lang-btn { font-size: 13px; padding: 6px 12px; margin: 4px; background: #333; color: white; border: 1px solid #555; border-radius: 8px; }
+    .lang-btn.active { background: cyan; color: black; border-color: cyan; font-weight: bold; }
+
+    .logBox {
+      max-height: 35vh; overflow-y: auto; border: 1px solid #555;
+      padding: 10px; margin-bottom: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px;
+    }
+    .logItem { margin-bottom: 12px; padding: 12px; border: 1px solid #333; border-radius: 8px; text-align: left; }
+  </style>
 </head>
 <body>
 
-<canvas id="bgCanvas"></canvas>
+  <canvas id="bgCanvas"></canvas>
 
-<div id="menu" class="center">
-  <h1>今何問目ゲーム</h1>
-  <button onclick="showRule()">ルール</button><br>
-  <button onclick="startGameWithBGM()">スタート</button>
-</div>
-
-<div id="rule" class="center">
-  <h2>ルール</h2>
-  <p style="text-align:left; display:inline-block; font-size:18px;">
-  ・問題の答えを数字で入力<br>
-  ・今何問目か覚える<br>
-  ・間違えたら終了
-  </p><br>
-  <button onclick="backMenu()">戻る</button>
-</div>
-
-<div id="game" class="center">
-  <div id="question"></div>
-  <div class="input-area">
-    <input id="answer" type="number" inputmode="numeric" pattern="[0-9]*">
-    <button id="submitBtn" onclick="submitAnswer()">OK</button>
+  <div id="menu" class="center">
+    <div class="lang-select">
+      <button class="lang-btn active" onclick="setLang('ja', event)">日本語</button>
+      <button class="lang-btn" onclick="setLang('en', event)">English</button>
+      <button class="lang-btn" onclick="setLang('zh_tw', event)">繁體中文</button>
+      <button class="lang-btn" onclick="setLang('zh_cn', event)">简体中文</button>
+    </div>
+    <h1 id="t-title">今何問目ゲーム</h1>
+    <button id="b-rule" onclick="showRule()">ルール</button><br>
+    <button id="b-start" onclick="startGameWithBGM()">スタート</button>
   </div>
-</div>
 
-<div id="end" class="center">
-  <h2>結果</h2>
-  <p id="summary" style="font-size:20px;"></p>
-  <div id="resultText" class="logBox"></div>
-  <button onclick="restart()">もう一回</button>
-</div>
+  <div id="rule" class="center">
+    <h2 id="t-rule-h">ルール</h2>
+    <p id="t-rule-p"></p><br>
+    <button id="b-back" onclick="backMenu()">戻る</button>
+  </div>
 
-<audio id="bgm" src="Guide_Me_to_Heaven.mp3" loop preload="auto"></audio>
-<audio id="seCorrect" src="se_correct.mp3" preload="auto"></audio>
-<audio id="seWrong" src="se_wrong.mp3" preload="auto"></audio>
+  <div id="game" class="center">
+    <div id="question"></div>
+    <div class="input-area">
+      <input id="answer" type="number" inputmode="decimal" pattern="[0-9]*" placeholder="?">
+      <button id="submitBtn" onclick="submitAnswer()">OK</button>
+    </div>
+  </div>
 
-<script>
-let currentQuestion = 1;
-let currentText = "";
-let correctAnswer = 0;
-let history = [];
-let timeLeft = 100;
-let timerInterval;
-let isSubmitting = false;
-let isGameOver = false;
+  <div id="end" class="center">
+    <h2 id="t-result-h">結果</h2>
+    <p id="summary"></p>
+    <div id="resultText" class="logBox"></div>
+    <button id="b-again" onclick="restart()">もう一回</button>
+  </div>
 
-const canvas = document.getElementById("bgCanvas");
-const ctx = canvas.getContext("2d");
+  <audio id="bgm" src="Guide_Me_to_Heaven.mp3" loop preload="auto"></audio>
+  <audio id="seCorrect" src="se_correct.mp3" preload="auto"></audio>
+  <audio id="seWrong" src="se_wrong.mp3" preload="auto"></audio>
 
-function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resize();
-window.onresize = resize;
+  <script>
+    const i18n = {
+      ja: {
+        title: "今何問目ゲーム", ruleBtn: "ルール", startBtn: "スタート",
+        ruleH: "ルール", ruleP: "・問題の答えを数字で入力<br>・今何問目か覚える<br>・間違えたら終了",
+        backBtn: "戻る", resultH: "結果", againBtn: "もう一回",
+        qPrefix: "問目", qAfter: "問後", qBefore: "問前", qFinal: "は何問目？",
+        qTrap: "今何問目？", record: "記録", attempts: "挑戦数", your: "あなた", correct: "正解",
+        ansCorrect: "○ 正解", ansWrong: "× 不正解", noAns: "未回答", qLog: "問目"
+      },
+      en: {
+        title: "Which Question?", ruleBtn: "Rules", startBtn: "Start",
+        ruleH: "Rules", ruleP: "・Enter the answer in numbers<br>・Remember the current number<br>・Game over if wrong",
+        backBtn: "Back", resultH: "Result", againBtn: "Try Again",
+        qPrefix: "Q", qAfter: " questions after", qBefore: " questions before", qFinal: "What is the number?",
+        qTrap: "What is the current question number?", record: "Record", attempts: "Total", your: "You", correct: "Correct",
+        ansCorrect: "○ Correct", ansWrong: "× Wrong", noAns: "No Answer", qLog: ""
+      },
+      zh_tw: {
+        title: "現在是第幾題？", ruleBtn: "規則", startBtn: "開始遊戲",
+        ruleH: "遊戲規則", ruleP: "・請輸入數字回答<br>・記住現在是第幾題<br>・答錯則遊戲結束",
+        backBtn: "返回", resultH: "結算", againBtn: "再玩一次",
+        qPrefix: "第", qAfter: "題後", qBefore: "題前", qFinal: "是第幾題？",
+        qTrap: "現在是第幾題？", record: "紀錄", attempts: "挑戰數", your: "你的回答", correct: "正確答案",
+        ansCorrect: "○ 正確", ansWrong: "× 錯誤", noAns: "未回答", qLog: "題"
+      },
+      zh_cn: {
+        title: "现在是第几题？", ruleBtn: "规则", startBtn: "开始游戏",
+        ruleH: "游戏规则", ruleP: "・请输入数字回答<br>・记住现在是第几题<br>・答错則游戏结束",
+        backBtn: "返回", resultH: "结算", againBtn: "再玩一次",
+        qPrefix: "第", qAfter: "题后", qBefore: "题前", qFinal: "是第几题？",
+        qTrap: "现在是第几题？", record: "纪录", attempts: "挑战数", your: "你的回答", correct: "正确答案",
+        ansCorrect: "○ 正确", ansWrong: "× 错误", noAns: "未回答", qLog: "题"
+      }
+    };
 
-const bgm = document.getElementById("bgm");
-bgm.loop = true;
-bgm.volume = 0.5;
-const seCorrect = document.getElementById("seCorrect");
-seCorrect.volume = 0.6;
-const seWrong = document.getElementById("seWrong");
-seWrong.volume = 0.6;
+    let lang = 'ja';
+    let currentQuestion = 1;
+    let currentText = "";
+    let correctAnswer = 0;
+    let history = [];
+    let timeLeft = 100;
+    let timerInterval;
+    let isSubmitting = false;
+    let isGameOver = false;
 
-function playAudio(audioObj) {
-  if (!audioObj) return;
-  audioObj.play().catch(e => console.warn("再生失敗:", e));
-}
+    const canvas = document.getElementById("bgCanvas");
+    const ctx = canvas.getContext("2d");
+    const bgm = document.getElementById("bgm");
+    const seCorrect = document.getElementById("seCorrect");
+    const seWrong = document.getElementById("seWrong");
 
-window.addEventListener("load", ()=>{
-    bgm.play().catch(e=>{
-        document.addEventListener("click", startAudio, {once: true});
-        document.addEventListener("keydown", startAudio, {once: true});
-    });
-});
+    bgm.volume = 0.5;
+    seCorrect.volume = 0.6;
+    seWrong.volume = 0.6;
 
-function startAudio(){
-    playAudio(bgm);
-}
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.onresize = resizeCanvas;
+    resizeCanvas();
 
-function showRule(){
-  menu.style.display="none";
-  rule.style.display="block";
-}
-function backMenu(){
-  rule.style.display="none";
-  menu.style.display="block";
-}
-function startGame(){
-  menu.style.display="none";
-  end.style.display="none";
-  game.style.display="block";
-  currentQuestion = 1;
-  history = [];
-  isGameOver = false;
-  isSubmitting = false;
-  answer.value = "";
-  document.body.classList.remove("flash");
-  canvas.classList.remove("blink");
-  forceFocus();
-  nextQuestion();
-}
+    function setLang(newLang, event) {
+      lang = newLang;
+      document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      updateLangUI();
+    }
 
-function restart(){
-  clearInterval(timerInterval);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  canvas.classList.remove("blink");
-  end.style.display = "none";
-  menu.style.display = "block";
-  playAudio(bgm);
-}
+    function updateLangUI() {
+      const t = i18n[lang];
+      document.getElementById('t-title').innerText = t.title;
+      document.getElementById('b-rule').innerText = t.ruleBtn;
+      document.getElementById('b-start').innerText = t.startBtn;
+      document.getElementById('t-rule-h').innerText = t.ruleH;
+      document.getElementById('t-rule-p').innerHTML = t.ruleP;
+      document.getElementById('b-back').innerText = t.backBtn;
+      document.getElementById('t-result-h').innerText = t.resultH;
+      document.getElementById('b-again').innerText = t.againBtn;
+    }
+    updateLangUI();
 
-function generateProblem(){
-  let base = Math.floor(Math.random()*20)+10;
-  let result = base;
-  let text = base + "問目";
-  for(let i=0;i<3;i++){
-    let num = Math.floor(Math.random()*9)+1;
-    if(Math.random()>0.5){
-      text += "の" + num + "問後";
-      result += num;
-    }else{
-      if(result - num < 1){
-        text += "の" + num + "問後";
-        result += num;
-      }else{
-        text += "の" + num + "問前";
-        result -= num;
+    function playAudio(audioObj) {
+      if (audioObj) {
+        audioObj.currentTime = 0;
+        audioObj.play().catch(e => {});
       }
     }
-  }
-  correctAnswer = result;
-  currentText = text + "は何問目？";
-  question.innerText = currentText;
-}
 
-function showTrap(){
-  correctAnswer = currentQuestion;
-  currentText = "今何問目？";
-  question.innerText = currentText;
-}
-
-function nextQuestion(){
-  clearInterval(timerInterval);
-  isSubmitting = false;
-  canvas.classList.remove("blink");
-  if(Math.random()<0.3) showTrap();
-  else generateProblem();
-  startTimer();
-}
-
-function startGameWithBGM(){
-  startGame();
-  playAudio(bgm);
-}
-
-function drawTimer(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  let cx = canvas.width/2;
-  let cy = canvas.height/2;
-  let a = Math.min(canvas.width,canvas.height)/2 - 60;
-  let b = a * 0.6;
-  let totalBars = 120;
-  let visibleBars = Math.floor((timeLeft/100)*totalBars);
-  if(timeLeft <= 30) canvas.classList.add("blink");
-  else canvas.classList.remove("blink");
-
-  for(let i=0;i<totalBars;i++){
-    let ang = (i/totalBars)*Math.PI*2 - Math.PI/2;
-    let x = cx + a*Math.cos(ang);
-    let y = cy + b*Math.sin(ang);
-    let nx = Math.cos(ang);
-    let ny = Math.sin(ang);
-    let color="#333";
-    if(i < visibleBars){
-      if(timeLeft<=30) color="red"; 
-      else if(timeLeft<60) color="orange";
-      else color="cyan";
-    }
-    ctx.beginPath();
-    ctx.moveTo(x,y);
-    ctx.lineTo(x+nx*18,y+ny*18);
-    ctx.strokeStyle=color;
-    ctx.lineWidth=3;
-    ctx.stroke();
-  }
-}
-
-function startTimer(){
-  timeLeft=100;
-  clearInterval(timerInterval);
-  timerInterval=setInterval(()=>{
-    if(isGameOver) return;
-    timeLeft--;
-    drawTimer();
-    if(timeLeft<=0){
-      canvas.classList.remove("blink");
-      history.push({
-        number: currentQuestion,
-        question: currentText,
-        your: "未回答",
-        correct: correctAnswer,
-        result: false
+    window.addEventListener("load", () => {
+      bgm.play().catch(e => {
+        document.addEventListener("click", () => playAudio(bgm), { once: true });
       });
-      gameOver();
-    }
-  },100);
-}
-
-function gameOver(){
-  if(isGameOver) return;
-  isGameOver = true;
-  clearInterval(timerInterval);
-  canvas.classList.remove("blink");
-  document.body.classList.add("flash");
-  seWrong.currentTime = 0;
-  playAudio(seWrong);
-  setTimeout(()=>{
-    game.style.display="none";
-    end.style.display="block";
-    let correctCount = history.filter(h => h.result).length;
-    summary.innerHTML = "記録: " + correctCount + "問<br>挑戦数: " + history.length + "問";
-    let html = "";
-    history.forEach(h=>{
-      html += `
-      <div class="logItem">
-        <b>${h.number}問目</b><br>${h.question}<br>
-        あなた: ${h.your} / 正解: ${h.correct}<br>
-        <span style="color:${h.result ? 'lime':'red'}">${h.result ? '○ 正解':'× 不正解'}</span>
-      </div>`;
     });
-    resultText.innerHTML = html;
-  },200);
-}
 
-function submitAnswer(){
-  if(answer.value === "" || isSubmitting || isGameOver) return;
-  isSubmitting = true;
-  clearInterval(timerInterval);
-  canvas.classList.remove("blink");
-  let input = Number(answer.value);
-  let record = {
-    number: currentQuestion,
-    question: currentText,
-    your: input,
-    correct: correctAnswer,
-    result: (input === correctAnswer)
-  };
-  history.push(record);
-  if(input !== correctAnswer){
-    gameOver();
-    return;
-  }
-  seCorrect.currentTime = 0;
-  playAudio(seCorrect);
-  currentQuestion++;
-  answer.value="";
-  nextQuestion();
-  forceFocus();
-}
-
-answer.addEventListener("keyup", e=>{
-  if(e.key==="Enter") submitAnswer();
-});
-
-function forceFocus(){
-  if(game.style.display==="block"){
-    answer.focus();
-  }
-}
-document.addEventListener("click", (e) => {
-  if(e.target.id !== "submitBtn") forceFocus();
-});
-window.addEventListener("focus", forceFocus);
-
-// ★追加：画面が隠れたら音を止める処理
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    bgm.pause();
-    seCorrect.pause();
-    seWrong.pause();
-  } else {
-    // 画面に戻ってきたときに、メニューかゲーム画面ならBGM再開
-    if (game.style.display === "block" || menu.style.display === "block") {
+    function showRule() {
+      document.getElementById("menu").style.display = "none";
+      document.getElementById("rule").style.display = "block";
+    }
+    function backMenu() {
+      document.getElementById("rule").style.display = "none";
+      document.getElementById("menu").style.display = "block";
+    }
+    function startGameWithBGM() {
+      startGame();
       playAudio(bgm);
     }
-  }
-});
+    function startGame() {
+      document.getElementById("menu").style.display = "none";
+      document.getElementById("end").style.display = "none";
+      document.getElementById("game").style.display = "block";
+      currentQuestion = 1; history = []; isGameOver = false; isSubmitting = false;
+      document.getElementById("answer").value = "";
+      document.body.classList.remove("flash");
+      canvas.classList.remove("blink");
+      nextQuestion();
+    }
+    function restart() {
+      clearInterval(timerInterval);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      document.getElementById("end").style.display = "none";
+      document.getElementById("menu").style.display = "block";
+      playAudio(bgm);
+    }
 
-</script>
+    function nextQuestion() {
+      clearInterval(timerInterval);
+      isSubmitting = false;
+      canvas.classList.remove("blink");
+      if (Math.random() < 0.3) {
+        correctAnswer = currentQuestion;
+        currentText = i18n[lang].qTrap;
+      } else {
+        generateNormalProblem();
+      }
+      document.getElementById("question").innerText = currentText;
+      startTimer();
+      setTimeout(() => document.getElementById("answer").focus(), 150);
+    }
+
+    function generateNormalProblem() {
+      const t = i18n[lang];
+      let baseNum = Math.floor(Math.random() * 20) + 10;
+      let resultNum = baseNum;
+      let text = (lang === 'en' || lang.startsWith('zh')) ? t.qPrefix + baseNum : baseNum + t.qPrefix;
+
+      for (let i = 0; i < 3; i++) {
+        let moveNum = Math.floor(Math.random() * 9) + 1;
+        let sep = (lang === 'ja') ? "の" : " ";
+        if (Math.random() > 0.5) {
+          text += sep + moveNum + t.qAfter;
+          resultNum += moveNum;
+        } else {
+          if (resultNum - moveNum < 1) {
+            text += sep + moveNum + t.qAfter;
+            resultNum += moveNum;
+          } else {
+            text += sep + moveNum + t.qBefore;
+            resultNum -= moveNum;
+          }
+        }
+      }
+      correctAnswer = resultNum;
+      currentText = text + (lang === 'en' ? " " : "") + t.qFinal;
+    }
+
+    function startTimer() {
+      timeLeft = 100;
+      timerInterval = setInterval(() => {
+        if (isGameOver) return;
+        timeLeft--;
+        drawTimerCanvas();
+        if (timeLeft <= 0) {
+          history.push({ number: currentQuestion, question: currentText, your: i18n[lang].noAns, correct: correctAnswer, result: false });
+          gameOver();
+        }
+      }, 100);
+    }
+
+    function drawTimerCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cx = canvas.width / 2; const cy = canvas.height / 2;
+      const rA = Math.min(canvas.width, canvas.height) / 2 - 60;
+      const rB = rA * 0.6;
+      const totalBars = 120;
+      const visibleBars = Math.floor((timeLeft / 100) * totalBars);
+
+      if (timeLeft <= 30) canvas.classList.add("blink"); else canvas.classList.remove("blink");
+
+      for (let i = 0; i < totalBars; i++) {
+        let angle = (i / totalBars) * Math.PI * 2 - Math.PI / 2;
+        let x = cx + rA * Math.cos(angle); let y = cy + rB * Math.sin(angle);
+        let color = (i < visibleBars) ? (timeLeft <= 30 ? "red" : (timeLeft < 60 ? "orange" : "cyan")) : "#333";
+        ctx.beginPath(); ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(angle) * 18, y + Math.sin(angle) * 18);
+        ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
+      }
+    }
+
+    function submitAnswer() {
+      const inputField = document.getElementById("answer");
+      if (inputField.value === "" || isSubmitting || isGameOver) return;
+      isSubmitting = true; clearInterval(timerInterval);
+      let inputAns = Number(inputField.value);
+      history.push({ number: currentQuestion, question: currentText, your: inputAns, correct: correctAnswer, result: (inputAns === correctAnswer) });
+      if (inputAns !== correctAnswer) { gameOver(); return; }
+      playAudio(seCorrect);
+      currentQuestion++; inputField.value = "";
+      nextQuestion();
+    }
+
+    document.getElementById("answer").addEventListener("keyup", (e) => { if (e.key === "Enter") submitAnswer(); });
+
+    function gameOver() {
+      if (isGameOver) return;
+      isGameOver = true; clearInterval(timerInterval);
+      document.body.classList.add("flash");
+      playAudio(seWrong);
+      setTimeout(() => {
+        document.getElementById("game").style.display = "none";
+        document.getElementById("end").style.display = "block";
+        const t = i18n[lang];
+        let correctCount = history.filter(r => r.result).length;
+        document.getElementById("summary").innerHTML = `${t.record}: ${correctCount}<br>${t.attempts}: ${history.length}`;
+        let logHtml = "";
+        history.forEach(r => {
+          let qNum = (lang === 'en' || lang.startsWith('zh')) ? t.qPrefix + r.number + t.qLog : r.number + t.qLog;
+          logHtml += `<div class="logItem"><b>${qNum}</b><br>${r.question}<br>${t.your}: ${r.your} / ${t.correct}: ${r.correct}<br><span style="color:${r.result?'lime':'red'}">${r.result?t.ansCorrect:t.ansWrong}</span></div>`;
+        });
+        document.getElementById("resultText").innerHTML = logHtml;
+      }, 200);
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) { bgm.pause(); } else {
+        if (document.getElementById("game").style.display === "block" || document.getElementById("menu").style.display === "block") playAudio(bgm);
+      }
+    });
+  </script>
 </body>
 </html>

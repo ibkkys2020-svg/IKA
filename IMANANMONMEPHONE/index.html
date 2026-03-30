@@ -95,9 +95,9 @@
     <button id="b-again" onclick="restart()">もう一回</button>
   </div>
 
-  <audio id="bgm" src="Guide_Me_to_Heaven.mp3" loop playsinline preload="auto"></audio>
-  <audio id="seCorrect" src="se_correct.mp3" playsinline preload="auto"></audio>
-  <audio id="seWrong" src="se_wrong.mp3" playsinline preload="auto"></audio>
+  <audio id="bgm" src="Guide_Me_to_Heaven.mp3" loop playsinline></audio>
+  <audio id="seCorrect" src="se_correct.mp3" playsinline></audio>
+  <audio id="seWrong" src="se_wrong.mp3" playsinline></audio>
 
   <script>
     const i18n = {
@@ -188,7 +188,6 @@
     }
     updateLangUI();
 
-    // ★重要: iPhone対策 - 最初にクリックされた時だけBGMを鳴らす。SEには一切触らない。
     function firstStart(event) {
       if(event) event.stopPropagation();
       
@@ -196,17 +195,33 @@
       bgm.play().catch(() => {});
       bgmStarted = true;
 
+      // 効果音をあらかじめ読み込んでおく
+      seCorrect.load();
+      seWrong.load();
+
       startGame();
     }
 
-    // 音を鳴らす処理を安全に
-    function playAudio(audioObj) {
-      if (audioObj) {
-        audioObj.pause();
-        audioObj.currentTime = 0;
-        audioObj.volume = 0.6;
-        // iOSはユーザー操作（OKボタンなど）に反応して再生する
-        audioObj.play().catch(() => {});
+    // ★改善ポイント：SEを鳴らすとき、BGMの音量を一瞬下げて通りやすくする
+    async function playSE(audioObj) {
+      if (!audioObj) return;
+      
+      // BGMの音量を少し下げる（SEを目立たせ、ブラウザの負荷を調整）
+      bgm.volume = 0.2;
+      
+      audioObj.pause();
+      audioObj.currentTime = 0;
+      audioObj.volume = 0.8;
+      
+      try {
+        await audioObj.play();
+        // 音が終わる頃にBGMの音量を戻す（SEは大体1秒以内と想定）
+        setTimeout(() => {
+          if (!isGameOver) bgm.volume = 0.5;
+        }, 800);
+      } catch (e) {
+        console.log("Audio play failed", e);
+        bgm.volume = 0.5; // 失敗しても戻す
       }
     }
 
@@ -236,10 +251,10 @@
       document.getElementById("end").style.display = "none";
       document.getElementById("menu").style.display = "block";
       
-      // 音楽が止まっていたら再生、流れていたらそのまま
       if (bgmStarted && bgm.paused) {
         bgm.play().catch(() => {});
       }
+      bgm.volume = 0.5;
     }
 
     function nextQuestion() {
@@ -327,8 +342,7 @@
       
       if (!isCorrect) { gameOver(); return; }
       
-      // ここでSEを鳴らす（OKボタンを押した直後なのでiPhoneでも許可される）
-      playAudio(seCorrect);
+      playSE(seCorrect);
       currentQuestion++; 
       inputField.value = "";
       nextQuestion();
@@ -348,7 +362,9 @@
       if (isGameOver) return;
       isGameOver = true; 
       clearInterval(timerInterval);
-      playAudio(seWrong);
+      
+      playSE(seWrong);
+      
       document.body.classList.add("flash");
       inputField.blur();
 

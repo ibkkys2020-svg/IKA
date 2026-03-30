@@ -144,7 +144,7 @@
     let timerInterval;
     let isSubmitting = false;
     let isGameOver = false;
-    let bgmStarted = false; // BGMが一度でも再生されたか
+    let bgmStarted = false;
 
     const canvas = document.getElementById("bgCanvas");
     const ctx = canvas.getContext("2d");
@@ -188,29 +188,24 @@
     }
     updateLangUI();
 
+    // ★重要: iPhone対策 - 最初にクリックされた時だけBGMを鳴らす。SEには一切触らない。
     function firstStart(event) {
       if(event) event.stopPropagation();
       
-      // 全音源の読み込みと許可
-      [bgm, seCorrect, seWrong].forEach(audio => {
-        audio.play().then(() => {
-          if (audio.id !== 'bgm') {
-            audio.pause();
-            audio.currentTime = 0;
-          }
-        }).catch(() => {});
-      });
-
       bgm.volume = 0.5;
+      bgm.play().catch(() => {});
       bgmStarted = true;
+
       startGame();
     }
 
+    // 音を鳴らす処理を安全に
     function playAudio(audioObj) {
       if (audioObj) {
         audioObj.pause();
         audioObj.currentTime = 0;
         audioObj.volume = 0.6;
+        // iOSはユーザー操作（OKボタンなど）に反応して再生する
         audioObj.play().catch(() => {});
       }
     }
@@ -235,14 +230,13 @@
       nextQuestion();
     }
 
-    // ★修正：リセットされないようにチェックを追加
     function restart() {
       clearInterval(timerInterval);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       document.getElementById("end").style.display = "none";
       document.getElementById("menu").style.display = "block";
       
-      // すでに流れていたら（bgmStartedがtrueなら）何もしない。止まっていたら再生。
+      // 音楽が止まっていたら再生、流れていたらそのまま
       if (bgmStarted && bgm.paused) {
         bgm.play().catch(() => {});
       }
@@ -333,6 +327,7 @@
       
       if (!isCorrect) { gameOver(); return; }
       
+      // ここでSEを鳴らす（OKボタンを押した直後なのでiPhoneでも許可される）
       playAudio(seCorrect);
       currentQuestion++; 
       inputField.value = "";

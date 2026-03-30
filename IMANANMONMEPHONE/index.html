@@ -16,7 +16,9 @@
     .blink { animation: blink-anime 0.2s infinite alternate; }
     @keyframes blink-anime { 0% { opacity: 1; } 100% { opacity: 0.3; } }
     .flash { animation: flash-anime 0.3s; }
+    .correct-flash { animation: correct-flash-anime 0.3s; }
     @keyframes flash-anime { 0% { background: red; } 100% { background: black; } }
+    @keyframes correct-flash-anime { 0% { background: #004400; } 100% { background: black; } }
     .center {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
       text-align: center; width: 95%; max-width: 450px; z-index: 10;
@@ -127,7 +129,7 @@
       },
       zh_cn: {
         title: "现在是第几题？", ruleBtn: "规则", startBtn: "开始游戏",
-        ruleH: "游戏规则", ruleP: "・请输入数字回答<br>・记住现在是第几题<br>・答错則游戏结束",
+        ruleH: "游戏规则", ruleP: "・请输入数字回答<br>・记住现在は第几题<br>・答错則游戏结束",
         backBtn: "返回", resultH: "结算", againBtn: "再玩一次",
         qPrefix: "第", qAfter: "题后", qBefore: "题前", qFinal: "是题第几题？",
         qTrap: "现在是第几题？", record: "纪录", attempts: "挑战数", your: "你的回答", correct: "正确答案",
@@ -190,38 +192,32 @@
 
     function firstStart(event) {
       if(event) event.stopPropagation();
-      
       bgm.volume = 0.5;
       bgm.play().catch(() => {});
       bgmStarted = true;
-
-      // 効果音をあらかじめ読み込んでおく
       seCorrect.load();
       seWrong.load();
-
       startGame();
     }
 
-    // ★改善ポイント：SEを鳴らすとき、BGMの音量を一瞬下げて通りやすくする
+    // ★重要：SEだけを個別にロードして鳴らす（BGMには干渉しない）
     async function playSE(audioObj) {
       if (!audioObj) return;
       
-      // BGMの音量を少し下げる（SEを目立たせ、ブラウザの負荷を調整）
-      bgm.volume = 0.2;
+      bgm.volume = 0.15; // SEを強調するためにBGM音量を下げる
       
       audioObj.pause();
+      audioObj.load(); // SEのみリロード（BGMはそのまま！）
       audioObj.currentTime = 0;
-      audioObj.volume = 0.8;
+      audioObj.volume = 0.9;
       
       try {
         await audioObj.play();
-        // 音が終わる頃にBGMの音量を戻す（SEは大体1秒以内と想定）
         setTimeout(() => {
           if (!isGameOver) bgm.volume = 0.5;
-        }, 800);
+        }, 500);
       } catch (e) {
-        console.log("Audio play failed", e);
-        bgm.volume = 0.5; // 失敗しても戻す
+        bgm.volume = 0.5;
       }
     }
 
@@ -240,7 +236,7 @@
       document.getElementById("game").style.display = "block";
       currentQuestion = 1; history = []; isGameOver = false; isSubmitting = false;
       inputField.value = "";
-      document.body.classList.remove("flash");
+      document.body.classList.remove("flash", "correct-flash");
       canvas.classList.remove("blink");
       nextQuestion();
     }
@@ -250,7 +246,7 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       document.getElementById("end").style.display = "none";
       document.getElementById("menu").style.display = "block";
-      
+      // BGMが止まっていれば再開（最初からはリセットされない）
       if (bgmStarted && bgm.paused) {
         bgm.play().catch(() => {});
       }
@@ -342,7 +338,11 @@
       
       if (!isCorrect) { gameOver(); return; }
       
+      // 正解演出
       playSE(seCorrect);
+      document.body.classList.add("correct-flash");
+      setTimeout(() => document.body.classList.remove("correct-flash"), 300);
+
       currentQuestion++; 
       inputField.value = "";
       nextQuestion();
@@ -362,9 +362,7 @@
       if (isGameOver) return;
       isGameOver = true; 
       clearInterval(timerInterval);
-      
       playSE(seWrong);
-      
       document.body.classList.add("flash");
       inputField.blur();
 

@@ -95,9 +95,9 @@
     <button id="b-again" onclick="restart()">もう一回</button>
   </div>
 
-  <audio id="bgm" src="Guide_Me_to_Heaven.mp3" loop preload="auto"></audio>
-  <audio id="seCorrect" src="se_correct.mp3" preload="auto"></audio>
-  <audio id="seWrong" src="se_wrong.mp3" preload="auto"></audio>
+  <audio id="bgm" src="Guide_Me_to_Heaven.mp3" loop playsinline preload="auto"></audio>
+  <audio id="seCorrect" src="se_correct.mp3" playsinline preload="auto"></audio>
+  <audio id="seWrong" src="se_wrong.mp3" playsinline preload="auto"></audio>
 
   <script>
     const i18n = {
@@ -129,7 +129,7 @@
         title: "现在是第几题？", ruleBtn: "规则", startBtn: "开始游戏",
         ruleH: "游戏规则", ruleP: "・请输入数字回答<br>・记住现在是第几题<br>・答错則游戏结束",
         backBtn: "返回", resultH: "结算", againBtn: "再玩一次",
-        qPrefix: "第", qAfter: "题后", qBefore: "题前", qFinal: "是第几题？",
+        qPrefix: "第", qAfter: "题后", qBefore: "题前", qFinal: "是题第几题？",
         qTrap: "现在是第几题？", record: "纪录", attempts: "挑战数", your: "你的回答", correct: "正确答案",
         ansCorrect: "○ 正确", ansWrong: "× 错误", noAns: "未回答", qLog: "题"
       }
@@ -144,7 +144,7 @@
     let timerInterval;
     let isSubmitting = false;
     let isGameOver = false;
-    let audioUnlocked = false;
+    let bgmStarted = false; // BGMが一度でも再生されたか
 
     const canvas = document.getElementById("bgCanvas");
     const ctx = canvas.getContext("2d");
@@ -188,36 +188,27 @@
     }
     updateLangUI();
 
-    // ★修正：スタート時に「鳴らさずに」アンロックだけする
     function firstStart(event) {
       if(event) event.stopPropagation();
       
-      if (!audioUnlocked) {
-        // volumeを0にして一瞬だけ再生→即停止でアンロック
-        const unlock = (audio) => {
-          audio.volume = 0;
-          audio.play().then(() => {
+      // 全音源の読み込みと許可
+      [bgm, seCorrect, seWrong].forEach(audio => {
+        audio.play().then(() => {
+          if (audio.id !== 'bgm') {
             audio.pause();
             audio.currentTime = 0;
-          }).catch(() => {});
-        };
-        unlock(bgm);
-        unlock(seCorrect);
-        unlock(seWrong);
-        audioUnlocked = true;
-      }
-      
-      // アンロック後、BGMだけをボリューム戻して再生
-      setTimeout(() => {
-        bgm.volume = 0.5;
-        bgm.play().catch(() => {});
-        startGame();
-      }, 50);
+          }
+        }).catch(() => {});
+      });
+
+      bgm.volume = 0.5;
+      bgmStarted = true;
+      startGame();
     }
 
     function playAudio(audioObj) {
-      if (audioObj && audioUnlocked) {
-        audioObj.pause(); // 念のため
+      if (audioObj) {
+        audioObj.pause();
         audioObj.currentTime = 0;
         audioObj.volume = 0.6;
         audioObj.play().catch(() => {});
@@ -244,12 +235,17 @@
       nextQuestion();
     }
 
+    // ★修正：リセットされないようにチェックを追加
     function restart() {
       clearInterval(timerInterval);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       document.getElementById("end").style.display = "none";
       document.getElementById("menu").style.display = "block";
-      if (bgm.paused && audioUnlocked) bgm.play().catch(() => {});
+      
+      // すでに流れていたら（bgmStartedがtrueなら）何もしない。止まっていたら再生。
+      if (bgmStarted && bgm.paused) {
+        bgm.play().catch(() => {});
+      }
     }
 
     function nextQuestion() {
@@ -353,13 +349,6 @@
       }
     });
 
-    inputField.addEventListener("input", (e) => {
-      const cleanValue = e.target.value.replace(/[^0-9]/g, "");
-      if (e.target.value !== cleanValue) {
-        e.target.value = cleanValue;
-      }
-    });
-
     function gameOver() {
       if (isGameOver) return;
       isGameOver = true; 
@@ -385,8 +374,8 @@
 
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) { bgm.pause(); } else {
-        if (document.getElementById("game").style.display === "block" || document.getElementById("menu").style.display === "block") {
-          if (audioUnlocked) bgm.play().catch(() => {});
+        if (bgmStarted && (document.getElementById("game").style.display === "block" || document.getElementById("menu").style.display === "block")) {
+          bgm.play().catch(() => {});
         }
       }
     });

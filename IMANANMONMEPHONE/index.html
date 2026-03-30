@@ -59,7 +59,6 @@ button {
   -webkit-tap-highlight-color: rgba(0,0,0,0);
 }
 
-/* ★OKボタン専用のスタイル */
 #submitBtn {
   background: cyan;
   color: black;
@@ -80,7 +79,6 @@ button {
   line-height: 1.3;
 }
 
-/* ★入力エリアを横並びに */
 .input-area {
   display: flex;
   justify-content: center;
@@ -384,7 +382,7 @@ function submitAnswer(){
   currentQuestion++;
   answer.value="";
   nextQuestion();
-  forceFocus(); // 次の問題でも入力欄にフォーカス
+  forceFocus();
 }
 
 answer.addEventListener("keyup", e=>{
@@ -397,10 +395,24 @@ function forceFocus(){
   }
 }
 document.addEventListener("click", (e) => {
-  // OKボタンをクリックしたときはフォーカス移動を邪魔しないようにする
   if(e.target.id !== "submitBtn") forceFocus();
 });
 window.addEventListener("focus", forceFocus);
+
+// ★追加：画面が隠れたら音を止める処理
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    bgm.pause();
+    seCorrect.pause();
+    seWrong.pause();
+  } else {
+    // 画面に戻ってきたときに、メニューかゲーム画面ならBGM再開
+    if (game.style.display === "block" || menu.style.display === "block") {
+      playAudio(bgm);
+    }
+  }
+});
+
 </script>
 </body>
 </html>

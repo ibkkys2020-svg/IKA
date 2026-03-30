@@ -46,7 +46,6 @@
     }
 
     .lang-select { margin-bottom: 25px; display: flex; flex-wrap: wrap; justify-content: center; }
-    /* 言語ボタンは span で作って、誤爆を防ぐよ */
     .lang-btn { 
       font-size: 13px; padding: 6px 12px; margin: 4px; background: #333; color: white; 
       border: 1px solid #555; border-radius: 8px; cursor: pointer; display: inline-block;
@@ -72,7 +71,7 @@
     </div>
     <h1 id="t-title">今何問目ゲーム</h1>
     <button id="b-rule" onclick="showRule()">ルール</button><br>
-    <button id="b-start" onclick="startGameWithBGM()">スタート</button>
+    <button id="b-start" onclick="firstStart(event)">スタート</button>
   </div>
 
   <div id="rule" class="center">
@@ -96,9 +95,9 @@
     <button id="b-again" onclick="restart()">もう一回</button>
   </div>
 
-  <audio id="bgm" src="Guide_Me_to_Heaven.mp3" loop preload="auto"></audio>
-  <audio id="seCorrect" src="se_correct.mp3" preload="auto"></audio>
-  <audio id="seWrong" src="se_wrong.mp3" preload="auto"></audio>
+  <audio id="bgm" src="Guide_Me_to_Heaven.mp3" loop preload="none"></audio>
+  <audio id="seCorrect" src="se_correct.mp3" preload="none"></audio>
+  <audio id="seWrong" src="se_wrong.mp3" preload="none"></audio>
 
   <script>
     const i18n = {
@@ -127,7 +126,7 @@
         ansCorrect: "○ 正確", ansWrong: "× 錯誤", noAns: "未回答", qLog: "題"
       },
       zh_cn: {
-        title: "现在是第几题？", ruleBtn: "规则", startBtn: "开始游戏",
+        title: "現在是第幾題？", ruleBtn: "规则", startBtn: "开始游戏",
         ruleH: "游戏规则", ruleP: "・请输入数字回答<br>・记住现在是第几题<br>・答错則游戏结束",
         backBtn: "返回", resultH: "结算", againBtn: "再玩一次",
         qPrefix: "第", qAfter: "题后", qBefore: "题前", qFinal: "是第几题？",
@@ -145,6 +144,7 @@
     let timerInterval;
     let isSubmitting = false;
     let isGameOver = false;
+    let audioUnlocked = false;
 
     const canvas = document.getElementById("bgCanvas");
     const ctx = canvas.getContext("2d");
@@ -160,7 +160,6 @@
     window.onresize = resizeCanvas;
     resizeCanvas();
 
-    // ★修正：言語選択ボタンなどを押した時はフォーカス処理をスルーする
     function refocus(e) {
       if (e && e.target.classList.contains('lang-btn')) return; 
       if (document.getElementById("game").style.display === "block" && !isGameOver) {
@@ -169,9 +168,7 @@
     }
 
     function setLang(newLang, event) {
-      // 伝播を止めて、bodyのclickイベント（refocus/unlockAudio）を一旦無視させる
-      if(event) event.stopImmediatePropagation();
-      
+      if(event) event.stopPropagation(); // 伝播を止めてbodyのclickイベントを防ぐ
       lang = newLang;
       document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
       event.target.classList.add('active');
@@ -191,27 +188,30 @@
     }
     updateLangUI();
 
-    function unlockAudio() {
-      if (bgm.paused) {
-        bgm.volume = 0;
-        bgm.play().then(() => { bgm.pause(); bgm.volume = 0.5; }).catch(e => {});
+    // ★重要：スタートボタンが押されたときだけ音を準備して鳴らす
+    async function firstStart(event) {
+      if(event) event.stopPropagation();
+      
+      if (!audioUnlocked) {
+        const unlock = async (audio) => {
+          audio.load();
+          audio.volume = 0;
+          await audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
+        };
+        await Promise.all([unlock(bgm), unlock(seCorrect), unlock(seWrong)]);
+        audioUnlocked = true;
       }
-      const unlockSE = (audio) => {
-        audio.volume = 0;
-        audio.play().then(() => { audio.pause(); audio.currentTime = 0; audio.volume = 0.6; }).catch(e => {});
-      };
-      unlockSE(seCorrect);
-      unlockSE(seWrong);
-      document.removeEventListener('click', unlockAudio);
-      document.removeEventListener('touchstart', unlockAudio);
+      
+      bgm.volume = 0.5;
+      bgm.play().catch(() => {});
+      startGame();
     }
-    document.addEventListener('click', unlockAudio);
-    document.addEventListener('touchstart', unlockAudio);
 
     function playAudio(audioObj) {
-      if (audioObj) {
+      if (audioObj && audioUnlocked) {
         audioObj.currentTime = 0;
-        audioObj.play().catch(e => {});
+        audioObj.volume = 0.6;
+        audioObj.play().catch(() => {});
       }
     }
 
@@ -222,11 +222,6 @@
     function backMenu() {
       document.getElementById("rule").style.display = "none";
       document.getElementById("menu").style.display = "block";
-    }
-
-    function startGameWithBGM() {
-      startGame();
-      if (bgm.paused) bgm.play().catch(e => {});
     }
 
     function startGame() {
@@ -245,7 +240,7 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       document.getElementById("end").style.display = "none";
       document.getElementById("menu").style.display = "block";
-      if (bgm.paused) bgm.play().catch(e => {});
+      if (bgm.paused && audioUnlocked) bgm.play().catch(() => {});
     }
 
     function nextQuestion() {
@@ -381,7 +376,9 @@
 
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) { bgm.pause(); } else {
-        if (document.getElementById("game").style.display === "block" || document.getElementById("menu").style.display === "block") bgm.play().catch(e=>{});
+        if (document.getElementById("game").style.display === "block" || document.getElementById("menu").style.display === "block") {
+          if (audioUnlocked) bgm.play().catch(() => {});
+        }
       }
     });
   </script>

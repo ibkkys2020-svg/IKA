@@ -10,47 +10,35 @@
       margin: 0; padding: 0; overflow: hidden; background: black;
       font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Kaku Gothic ProN", sans-serif;
       color: white; -webkit-text-size-adjust: 100%;
+      -webkit-tap-highlight-color: transparent;
     }
-
     #bgCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
-
     .blink { animation: blink-anime 0.2s infinite alternate; }
     @keyframes blink-anime { 0% { opacity: 1; } 100% { opacity: 0.3; } }
-
     .flash { animation: flash-anime 0.3s; }
     @keyframes flash-anime { 0% { background: red; } 100% { background: black; } }
-
     .center {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
       text-align: center; width: 95%; max-width: 450px; z-index: 10;
     }
-
     #game, #rule, #end { display: none; }
-
     h1 { font-size: 28px; margin-bottom: 25px; }
     h2 { font-size: 24px; margin-bottom: 20px; }
     #question { font-size: 28px; margin-bottom: 30px; line-height: 1.3; }
     #t-rule-p { text-align: left; display: inline-block; font-size: 16px; line-height: 1.6; margin-bottom: 20px; }
     #summary { font-size: 18px; line-height: 1.5; margin-bottom: 15px; }
-
     button {
       font-size: 18px; padding: 12px 24px; margin: 8px; border-radius: 12px;
       border: none; cursor: pointer; background: #eee; color: #333;
-      -webkit-tap-highlight-color: rgba(0,0,0,0);
     }
-
     #submitBtn { background: cyan; color: black; font-weight: bold; margin-left: 8px; }
-
     .input-area { display: flex; justify-content: center; align-items: center; }
-
-    /* ★数字入力欄のスクロール・矢印を消す設定 */
+    
     input {
-      font-size: 32px; width: 100px; text-align: center; border-radius: 12px;
+      font-size: 32px; width: 140px; text-align: center; border-radius: 12px;
       border: 2px solid #555; padding: 10px; background: black; color: white; outline: none;
-      -moz-appearance: textfield; /* Firefox用 */
+      appearance: none; -moz-appearance: textfield;
     }
-
-    /* Chrome, Safari, Edge用のスピンボタン非表示設定 */
     input::-webkit-outer-spin-button,
     input::-webkit-inner-spin-button {
       -webkit-appearance: none;
@@ -60,7 +48,6 @@
     .lang-select { margin-bottom: 25px; display: flex; flex-wrap: wrap; justify-content: center; }
     .lang-btn { font-size: 13px; padding: 6px 12px; margin: 4px; background: #333; color: white; border: 1px solid #555; border-radius: 8px; }
     .lang-btn.active { background: cyan; color: black; border-color: cyan; font-weight: bold; }
-
     .logBox {
       max-height: 35vh; overflow-y: auto; border: 1px solid #555;
       padding: 10px; margin-bottom: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px;
@@ -68,7 +55,7 @@
     .logItem { margin-bottom: 12px; padding: 12px; border: 1px solid #333; border-radius: 8px; text-align: left; }
   </style>
 </head>
-<body>
+<body onclick="refocus()">
 
   <canvas id="bgCanvas"></canvas>
 
@@ -93,7 +80,7 @@
   <div id="game" class="center">
     <div id="question"></div>
     <div class="input-area">
-      <input id="answer" type="number" inputmode="decimal" pattern="[0-9]*" placeholder="?">
+      <input id="answer" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="?" autocomplete="off">
       <button id="submitBtn" onclick="submitAnswer()">OK</button>
     </div>
   </div>
@@ -160,10 +147,7 @@
     const bgm = document.getElementById("bgm");
     const seCorrect = document.getElementById("seCorrect");
     const seWrong = document.getElementById("seWrong");
-
-    bgm.volume = 0.5;
-    seCorrect.volume = 0.6;
-    seWrong.volume = 0.6;
+    const inputField = document.getElementById("answer");
 
     function resizeCanvas() {
       canvas.width = window.innerWidth;
@@ -171,6 +155,12 @@
     }
     window.onresize = resizeCanvas;
     resizeCanvas();
+
+    function refocus() {
+      if (document.getElementById("game").style.display === "block" && !isGameOver) {
+        inputField.focus();
+      }
+    }
 
     function setLang(newLang, event) {
       lang = newLang;
@@ -192,18 +182,29 @@
     }
     updateLangUI();
 
+    function unlockAudio() {
+      if (bgm.paused) {
+        bgm.volume = 0;
+        bgm.play().then(() => { bgm.pause(); bgm.volume = 0.5; }).catch(e => {});
+      }
+      const unlockSE = (audio) => {
+        audio.volume = 0;
+        audio.play().then(() => { audio.pause(); audio.currentTime = 0; audio.volume = 0.6; }).catch(e => {});
+      };
+      unlockSE(seCorrect);
+      unlockSE(seWrong);
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    }
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+
     function playAudio(audioObj) {
       if (audioObj) {
         audioObj.currentTime = 0;
         audioObj.play().catch(e => {});
       }
     }
-
-    window.addEventListener("load", () => {
-      bgm.play().catch(e => {
-        document.addEventListener("click", () => playAudio(bgm), { once: true });
-      });
-    });
 
     function showRule() {
       document.getElementById("menu").style.display = "none";
@@ -213,26 +214,29 @@
       document.getElementById("rule").style.display = "none";
       document.getElementById("menu").style.display = "block";
     }
+
     function startGameWithBGM() {
       startGame();
-      playAudio(bgm);
+      if (bgm.paused) bgm.play().catch(e => {});
     }
+
     function startGame() {
       document.getElementById("menu").style.display = "none";
       document.getElementById("end").style.display = "none";
       document.getElementById("game").style.display = "block";
       currentQuestion = 1; history = []; isGameOver = false; isSubmitting = false;
-      document.getElementById("answer").value = "";
+      inputField.value = "";
       document.body.classList.remove("flash");
       canvas.classList.remove("blink");
       nextQuestion();
     }
+
     function restart() {
       clearInterval(timerInterval);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       document.getElementById("end").style.display = "none";
       document.getElementById("menu").style.display = "block";
-      playAudio(bgm);
+      if (bgm.paused) bgm.play().catch(e => {});
     }
 
     function nextQuestion() {
@@ -247,7 +251,7 @@
       }
       document.getElementById("question").innerText = currentText;
       startTimer();
-      setTimeout(() => document.getElementById("answer").focus(), 150);
+      setTimeout(() => inputField.focus(), 50);
     }
 
     function generateNormalProblem() {
@@ -310,24 +314,51 @@
     }
 
     function submitAnswer() {
-      const inputField = document.getElementById("answer");
       if (inputField.value === "" || isSubmitting || isGameOver) return;
-      isSubmitting = true; clearInterval(timerInterval);
+      isSubmitting = true; 
+      clearInterval(timerInterval);
+      
       let inputAns = Number(inputField.value);
-      history.push({ number: currentQuestion, question: currentText, your: inputAns, correct: correctAnswer, result: (inputAns === correctAnswer) });
-      if (inputAns !== correctAnswer) { gameOver(); return; }
+      let isCorrect = (inputAns === correctAnswer);
+      history.push({ number: currentQuestion, question: currentText, your: inputAns, correct: correctAnswer, result: isCorrect });
+      
+      if (!isCorrect) { gameOver(); return; }
+      
       playAudio(seCorrect);
-      currentQuestion++; inputField.value = "";
+      currentQuestion++; 
+      inputField.value = "";
       nextQuestion();
     }
 
-    document.getElementById("answer").addEventListener("keyup", (e) => { if (e.key === "Enter") submitAnswer(); });
+    // ★重要：数字以外の入力を徹底ガードする仕組み
+    inputField.addEventListener("keydown", (e) => { 
+      // 特殊キー（消去、エンターなど）は許可
+      const isControl = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Enter"].includes(e.key);
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submitAnswer(); 
+      } else if (!/^[0-9]$/.test(e.key) && !isControl) {
+        // 数字以外（e, -, . アルファベット全部）を即ブロック
+        e.preventDefault();
+      }
+    });
+
+    // ★さらに強力に：入力された瞬間に数字以外を強制削除（予測変換対策）
+    inputField.addEventListener("input", (e) => {
+      const cleanValue = e.target.value.replace(/[^0-9]/g, "");
+      if (e.target.value !== cleanValue) {
+        e.target.value = cleanValue;
+      }
+    });
 
     function gameOver() {
       if (isGameOver) return;
-      isGameOver = true; clearInterval(timerInterval);
-      document.body.classList.add("flash");
+      isGameOver = true; 
+      clearInterval(timerInterval);
       playAudio(seWrong);
+      document.body.classList.add("flash");
+      inputField.blur();
+
       setTimeout(() => {
         document.getElementById("game").style.display = "none";
         document.getElementById("end").style.display = "block";
@@ -345,7 +376,7 @@
 
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) { bgm.pause(); } else {
-        if (document.getElementById("game").style.display === "block" || document.getElementById("menu").style.display === "block") playAudio(bgm);
+        if (document.getElementById("game").style.display === "block" || document.getElementById("menu").style.display === "block") bgm.play().catch(e=>{});
       }
     });
   </script>
